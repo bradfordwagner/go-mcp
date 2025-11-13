@@ -8,7 +8,6 @@ import (
 	"template_cli/internal/appcontext"
 	"template_cli/internal/log"
 
-	"github.com/argoproj/argo-cd/v2/pkg/apiclient/cluster"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
@@ -21,11 +20,6 @@ type ListClustersInput struct {
 type ListClustersOutput struct {
 	Items interface{} `json:"items" jsonschema:"raw cluster list from Argo CD API"`
 }
-
-const (
-	// ClusterCacheTTL is the default time-to-live for cluster cache
-	ClusterCacheTTL = 60 * time.Minute
-)
 
 // NewListClustersHandler creates a ListClusters handler with the provided AppContext
 func NewListClustersHandler(appCtx *appcontext.AppContext) func(context.Context, *mcp.CallToolRequest, ListClustersInput) (*mcp.CallToolResult, ListClustersOutput, error) {
@@ -45,30 +39,21 @@ func NewListClustersHandler(appCtx *appcontext.AppContext) func(context.Context,
 			}, nil
 		}
 
-		// Cache miss or expired - fetch from ArgoCD
-		l.Info("Cache miss, fetching clusters from ArgoCD")
-		conn, clusterClient, err := appCtx.ArgoClient.NewClusterClient()
-		if err != nil {
-			l.Errorw("Failed to create cluster client", "error", err)
-			return nil, ListClustersOutput{}, fmt.Errorf("failed to create cluster client: %w", err)
-		}
-		defer conn.Close()
-
-		// List clusters
-		clusterList, err := clusterClient.List(ctx, &cluster.ClusterQuery{})
-		if err != nil {
-			l.Errorw("Failed to list clusters", "error", err)
-			return nil, ListClustersOutput{}, fmt.Errorf("failed to list clusters: %w", err)
+		// Cache miss or expired - refresh from ArgoCD
+		l.Info("Cache miss, refreshing clusters from ArgoCD")
+		if err := appCtx.RefreshClusterCache(ctx); err != nil {
+			return nil, ListClustersOutput{}, fmt.Errorf("failed to refresh cluster cache: %w", err)
 		}
 
-		l.Infow("Successfully fetched clusters from ArgoCD", "count", len(clusterList.Items))
+		// Get the freshly cached clusters
+		cachedClusters := appCtx.GetCachedClusters()
+		if cachedClusters == nil {
+			return nil, ListClustersOutput{}, fmt.Errorf("cluster cache is unexpectedly empty after refresh")
+		}
 
-		// Cache the results
-		appCtx.SetClusterCache(clusterList.Items, ClusterCacheTTL)
-
-		// Return raw response from Argo CD API
+		// Return cached response
 		return nil, ListClustersOutput{
-			Items: clusterList.Items,
+			Items: cachedClusters.Items,
 		}, nil
 	}
 }

@@ -2,7 +2,6 @@ package appcontext
 
 import (
 	"encoding/json"
-	"fmt"
 	"os"
 	"path/filepath"
 	"sync"
@@ -11,13 +10,9 @@ import (
 	"template_cli/internal/log"
 
 	"github.com/argoproj/argo-cd/v2/pkg/apiclient"
-	"github.com/argoproj/argo-cd/v2/pkg/apis/application/v1alpha1"
 )
 
 const (
-	// ClusterCacheFile is the filename for the cluster cache
-	ClusterCacheFile = "cluster_cache.json"
-
 	// ServerConfigFile is the filename for the server configuration cache
 	ServerConfigFile = "server_config.json"
 )
@@ -33,13 +28,6 @@ type AppContext struct {
 	// ClusterCache holds cached cluster information
 	clusterCache      *ClusterCache
 	clusterCacheMutex sync.RWMutex
-}
-
-// ClusterCache represents cached cluster list data
-type ClusterCache struct {
-	Items     []v1alpha1.Cluster `json:"items"`
-	CachedAt  time.Time          `json:"cached_at"`
-	ExpiresAt time.Time          `json:"expires_at"`
 }
 
 // ServerConfig represents cached server configuration
@@ -75,107 +63,6 @@ func NewAppContext(argoClient apiclient.Client, argoServer string) *AppContext {
 	ctx.loadClusterCacheFromDisk()
 
 	return ctx
-}
-
-// GetCachedClusters retrieves the cached cluster list if it's still valid
-// Returns nil if cache is expired or doesn't exist
-func (ctx *AppContext) GetCachedClusters() *ClusterCache {
-	ctx.clusterCacheMutex.RLock()
-	defer ctx.clusterCacheMutex.RUnlock()
-
-	if ctx.clusterCache == nil {
-		return nil
-	}
-
-	if time.Now().After(ctx.clusterCache.ExpiresAt) {
-		return nil
-	}
-
-	return ctx.clusterCache
-}
-
-// SetClusterCache updates the cluster cache with the given items and TTL
-func (ctx *AppContext) SetClusterCache(items []v1alpha1.Cluster, ttl time.Duration) {
-	ctx.clusterCacheMutex.Lock()
-	defer ctx.clusterCacheMutex.Unlock()
-
-	now := time.Now()
-	ctx.clusterCache = &ClusterCache{
-		Items:     items,
-		CachedAt:  now,
-		ExpiresAt: now.Add(ttl),
-	}
-
-	// Persist to disk
-	if err := ctx.writeClusterCacheToDisk(); err != nil {
-		log.Logger().Warnw("Failed to write cluster cache to disk", "error", err)
-	}
-}
-
-// InvalidateClusterCache clears the cluster cache
-func (ctx *AppContext) InvalidateClusterCache() {
-	ctx.clusterCacheMutex.Lock()
-	defer ctx.clusterCacheMutex.Unlock()
-
-	ctx.clusterCache = nil
-
-	// Remove cache file from disk
-	cachePath := filepath.Join(log.ContextDir, ClusterCacheFile)
-	if err := os.Remove(cachePath); err != nil && !os.IsNotExist(err) {
-		log.Logger().Warnw("Failed to remove cluster cache file", "error", err)
-	}
-}
-
-// writeClusterCacheToDisk persists the cluster cache to disk (caller must hold lock)
-func (ctx *AppContext) writeClusterCacheToDisk() error {
-	if ctx.clusterCache == nil {
-		return nil
-	}
-
-	cachePath := filepath.Join(log.ContextDir, ClusterCacheFile)
-
-	data, err := json.MarshalIndent(ctx.clusterCache, "", "  ")
-	if err != nil {
-		return fmt.Errorf("failed to marshal cluster cache: %w", err)
-	}
-
-	if err := os.WriteFile(cachePath, data, 0644); err != nil {
-		return fmt.Errorf("failed to write cluster cache file: %w", err)
-	}
-
-	return nil
-}
-
-// loadClusterCacheFromDisk loads the cluster cache from disk if it exists and is valid
-func (ctx *AppContext) loadClusterCacheFromDisk() {
-	ctx.clusterCacheMutex.Lock()
-	defer ctx.clusterCacheMutex.Unlock()
-
-	cachePath := filepath.Join(log.ContextDir, ClusterCacheFile)
-
-	data, err := os.ReadFile(cachePath)
-	if err != nil {
-		if !os.IsNotExist(err) {
-			log.Logger().Warnw("Failed to read cluster cache file", "error", err)
-		}
-		return
-	}
-
-	var cache ClusterCache
-	if err := json.Unmarshal(data, &cache); err != nil {
-		log.Logger().Warnw("Failed to unmarshal cluster cache", "error", err)
-		return
-	}
-
-	// Check if cache is expired
-	if time.Now().After(cache.ExpiresAt) {
-		// Cache is expired, remove the file
-		os.Remove(cachePath)
-		return
-	}
-
-	// Cache is valid, use it
-	ctx.clusterCache = &cache
 }
 
 // hasServerChanged checks if the current server URL differs from the cached one
