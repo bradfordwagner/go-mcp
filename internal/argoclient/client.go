@@ -15,8 +15,15 @@ type Config struct {
 	Insecure  bool
 }
 
+// ClientWithServer wraps an Argo CD client with its server URL
+type ClientWithServer struct {
+	Client apiclient.Client
+	Server string
+}
+
 // NewClient creates a new Argo CD API client with the provided configuration
-func NewClient(cfg Config) (apiclient.Client, error) {
+// Returns the client and the normalized server URL it's connected to
+func NewClient(cfg Config) (*ClientWithServer, error) {
 	// Get server address from config or environment
 	server := cfg.Server
 	if server == "" {
@@ -52,5 +59,8 @@ func NewClient(cfg Config) (apiclient.Client, error) {
 		return nil, fmt.Errorf("failed to create Argo CD client: %w", err)
 	}
 
-	return apiClient, nil
+	return &ClientWithServer{
+		Client: apiClient,
+		Server: server,
+	}, nil
 }

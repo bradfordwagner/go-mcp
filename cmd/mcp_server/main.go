@@ -30,13 +30,14 @@ func SayHi(ctx context.Context, req *mcp.CallToolRequest, input Input) (
 func main() {
 	// Initialize ArgoCD client
 	// Client config will be read from environment variables (ARGOCD_BASE_URL, ARGOCD_API_TOKEN)
-	argoClient, err := argoclient.NewClient(argoclient.Config{})
+	argoClientWithServer, err := argoclient.NewClient(argoclient.Config{})
 	if err != nil {
 		log.Fatalf("Failed to create ArgoCD client: %v", err)
 	}
 
 	// Create application context with shared state and dependencies
-	appCtx := appcontext.NewAppContext(argoClient)
+	// The server URL is passed to enable cache invalidation when it changes
+	appCtx := appcontext.NewAppContext(argoClientWithServer.Client, argoClientWithServer.Server)
 
 	// Create a server with multiple tools.
 	server := mcp.NewServer(&mcp.Implementation{Name: "greeter", Version: "v1.0.0"}, nil)

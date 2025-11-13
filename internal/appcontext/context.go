@@ -18,12 +18,18 @@ const (
 
 	// ClusterCacheFile is the filename for the cluster cache
 	ClusterCacheFile = "cluster_cache.json"
+
+	// ServerConfigFile is the filename for the server configuration cache
+	ServerConfigFile = "server_config.json"
 )
 
 // AppContext holds shared application state and dependencies
 type AppContext struct {
 	// ArgoClient is the initialized ArgoCD API client
 	ArgoClient apiclient.Client
+
+	// ArgoServer is the ArgoCD server URL we're connected to
+	ArgoServer string
 
 	// ClusterCache holds cached cluster information
 	clusterCache      *ClusterCache
@@ -37,10 +43,18 @@ type ClusterCache struct {
 	ExpiresAt time.Time          `json:"expires_at"`
 }
 
+// ServerConfig represents cached server configuration
+type ServerConfig struct {
+	Server  string    `json:"server"`
+	SavedAt time.Time `json:"saved_at"`
+}
+
 // NewAppContext creates a new application context
-func NewAppContext(argoClient apiclient.Client) *AppContext {
+// If the server URL has changed since the last run, all caches will be invalidated
+func NewAppContext(argoClient apiclient.Client, argoServer string) *AppContext {
 	ctx := &AppContext{
 		ArgoClient: argoClient,
+		ArgoServer: argoServer,
 	}
 
 	// Ensure context directory exists
@@ -48,6 +62,15 @@ func NewAppContext(argoClient apiclient.Client) *AppContext {
 		// Log error but don't fail - we can still run without cache
 		fmt.Fprintf(os.Stderr, "Warning: failed to create context directory: %v\n", err)
 	}
+
+	// Check if server has changed and invalidate caches if needed
+	if ctx.hasServerChanged() {
+		fmt.Fprintf(os.Stderr, "ArgoCD server has changed, invalidating all caches\n")
+		ctx.deleteAllCaches()
+	}
+
+	// Save current server configuration
+	ctx.saveServerConfig()
 
 	// Try to load existing cache from disk
 	ctx.loadClusterCacheFromDisk()
@@ -154,4 +177,69 @@ func (ctx *AppContext) loadClusterCacheFromDisk() {
 
 	// Cache is valid, use it
 	ctx.clusterCache = &cache
+}
+
+// hasServerChanged checks if the current server URL differs from the cached one
+func (ctx *AppContext) hasServerChanged() bool {
+	serverConfigPath := filepath.Join(ContextDir, ServerConfigFile)
+
+	data, err := os.ReadFile(serverConfigPath)
+	if err != nil {
+		// If file doesn't exist, this is first run or cache was cleared
+		if os.IsNotExist(err) {
+			return false
+		}
+		fmt.Fprintf(os.Stderr, "Warning: failed to read server config file: %v\n", err)
+		return false
+	}
+
+	var serverConfig ServerConfig
+	if err := json.Unmarshal(data, &serverConfig); err != nil {
+		fmt.Fprintf(os.Stderr, "Warning: failed to unmarshal server config: %v\n", err)
+		return false
+	}
+
+	// Compare cached server with current server
+	return serverConfig.Server != ctx.ArgoServer
+}
+
+// saveServerConfig saves the current server configuration to disk
+func (ctx *AppContext) saveServerConfig() {
+	serverConfigPath := filepath.Join(ContextDir, ServerConfigFile)
+
+	serverConfig := ServerConfig{
+		Server:  ctx.ArgoServer,
+		SavedAt: time.Now(),
+	}
+
+	data, err := json.MarshalIndent(serverConfig, "", "  ")
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Warning: failed to marshal server config: %v\n", err)
+		return
+	}
+
+	if err := os.WriteFile(serverConfigPath, data, 0644); err != nil {
+		fmt.Fprintf(os.Stderr, "Warning: failed to write server config file: %v\n", err)
+	}
+}
+
+// deleteAllCaches removes all cache files from disk
+func (ctx *AppContext) deleteAllCaches() {
+	// List of cache files to delete
+	cacheFiles := []string{
+		ClusterCacheFile,
+		// Add more cache files here as they are added to the system
+	}
+
+	for _, cacheFile := range cacheFiles {
+		cachePath := filepath.Join(ContextDir, cacheFile)
+		if err := os.Remove(cachePath); err != nil && !os.IsNotExist(err) {
+			fmt.Fprintf(os.Stderr, "Warning: failed to remove cache file %s: %v\n", cacheFile, err)
+		}
+	}
+
+	// Clear in-memory cache
+	ctx.clusterCacheMutex.Lock()
+	ctx.clusterCache = nil
+	ctx.clusterCacheMutex.Unlock()
 }
