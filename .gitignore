@@ -2,3 +2,4 @@ dist/
 taskfiles/
 bin/
 mcp_server
+.env.sh

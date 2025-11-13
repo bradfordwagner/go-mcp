@@ -2,6 +2,8 @@
 
 version: '3'
 
+dotenv: ['.env.sh']
+
 tasks:
   default:
     cmds:
@@ -9,3 +11,29 @@ tasks:
       - goreleaser build --snapshot --clean
       - tree dist
     silent: true
+
+  # Quick development tasks
+  test:
+    desc: Test the MCP server with a simple greet command
+    cmds:
+      - go run ./cmd/test_client greet '{"name":"Developer"}'
+
+  test-argo:
+    desc: Test the ArgoCD list_clusters tool
+    cmds:
+      - go run ./cmd/test_client argocd_list_clusters '{}'
+
+  test-custom:
+    desc: "Test a custom tool (usage: task test-custom TOOL=tool_name ARGS='{\"key\":\"value\"}')"
+    cmds:
+      - go run ./cmd/test_client {{.TOOL}} '{{.ARGS}}'
+
+  watch:
+    desc: Watch for changes and run tests automatically
+    cmds:
+      - ./scripts/dev-watch.sh
+
+  dev:
+    desc: Run the server directly (for manual testing)
+    cmds:
+      - go run ./cmd/mcp_server
