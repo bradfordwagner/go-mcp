@@ -91,14 +91,17 @@ func (ctx *AppContext) RefreshClusterCache(ctxIn context.Context) error {
 	}
 	defer conn.Close()
 
-	// List clusters
+	// List clusters with timing
+	listStartTime := time.Now()
 	clusterList, err := clusterClient.List(ctxIn, &cluster.ClusterQuery{})
+	listDuration := time.Since(listStartTime)
+
 	if err != nil {
-		l.Errorw("Failed to list clusters", "error", err)
+		l.Errorw("Failed to list clusters", "error", err, "duration", listDuration)
 		return fmt.Errorf("failed to list clusters: %w", err)
 	}
 
-	l.Infow("Successfully fetched clusters from ArgoCD", "count", len(clusterList.Items))
+	l.Infow("Successfully fetched clusters from ArgoCD", "count", len(clusterList.Items), "duration", listDuration.String())
 
 	// Cache the results
 	ctx.SetClusterCache(clusterList.Items, ClusterCacheTTL)
