@@ -8,14 +8,14 @@ import (
 	"sync"
 	"time"
 
+	"template_cli/internal/log"
+
 	"github.com/argoproj/argo-cd/v2/pkg/apiclient"
 	"github.com/argoproj/argo-cd/v2/pkg/apis/application/v1alpha1"
+	"go.uber.org/zap"
 )
 
 const (
-	// ContextDir is the directory where cache files are stored
-	ContextDir = "/tmp/bw-mcp"
-
 	// ClusterCacheFile is the filename for the cluster cache
 	ClusterCacheFile = "cluster_cache.json"
 
@@ -58,14 +58,14 @@ func NewAppContext(argoClient apiclient.Client, argoServer string) *AppContext {
 	}
 
 	// Ensure context directory exists
-	if err := os.MkdirAll(ContextDir, 0755); err != nil {
+	if err := os.MkdirAll(log.ContextDir, 0755); err != nil {
 		// Log error but don't fail - we can still run without cache
-		fmt.Fprintf(os.Stderr, "Warning: failed to create context directory: %v\n", err)
+		log.Logger().Warn("Failed to create context directory", zap.Error(err))
 	}
 
 	// Check if server has changed and invalidate caches if needed
 	if ctx.hasServerChanged() {
-		fmt.Fprintf(os.Stderr, "ArgoCD server has changed, invalidating all caches\n")
+		log.Logger().Info("ArgoCD server has changed, invalidating all caches")
 		ctx.deleteAllCaches()
 	}
 
@@ -109,7 +109,7 @@ func (ctx *AppContext) SetClusterCache(items []v1alpha1.Cluster, ttl time.Durati
 
 	// Persist to disk
 	if err := ctx.writeClusterCacheToDisk(); err != nil {
-		fmt.Fprintf(os.Stderr, "Warning: failed to write cluster cache to disk: %v\n", err)
+		log.Logger().Warn("Failed to write cluster cache to disk", zap.Error(err))
 	}
 }
 
@@ -121,9 +121,9 @@ func (ctx *AppContext) InvalidateClusterCache() {
 	ctx.clusterCache = nil
 
 	// Remove cache file from disk
-	cachePath := filepath.Join(ContextDir, ClusterCacheFile)
+	cachePath := filepath.Join(log.ContextDir, ClusterCacheFile)
 	if err := os.Remove(cachePath); err != nil && !os.IsNotExist(err) {
-		fmt.Fprintf(os.Stderr, "Warning: failed to remove cluster cache file: %v\n", err)
+		log.Logger().Warn("Failed to remove cluster cache file", zap.Error(err))
 	}
 }
 
@@ -133,7 +133,7 @@ func (ctx *AppContext) writeClusterCacheToDisk() error {
 		return nil
 	}
 
-	cachePath := filepath.Join(ContextDir, ClusterCacheFile)
+	cachePath := filepath.Join(log.ContextDir, ClusterCacheFile)
 
 	data, err := json.MarshalIndent(ctx.clusterCache, "", "  ")
 	if err != nil {
@@ -152,19 +152,19 @@ func (ctx *AppContext) loadClusterCacheFromDisk() {
 	ctx.clusterCacheMutex.Lock()
 	defer ctx.clusterCacheMutex.Unlock()
 
-	cachePath := filepath.Join(ContextDir, ClusterCacheFile)
+	cachePath := filepath.Join(log.ContextDir, ClusterCacheFile)
 
 	data, err := os.ReadFile(cachePath)
 	if err != nil {
 		if !os.IsNotExist(err) {
-			fmt.Fprintf(os.Stderr, "Warning: failed to read cluster cache file: %v\n", err)
+			log.Logger().Warn("Failed to read cluster cache file", zap.Error(err))
 		}
 		return
 	}
 
 	var cache ClusterCache
 	if err := json.Unmarshal(data, &cache); err != nil {
-		fmt.Fprintf(os.Stderr, "Warning: failed to unmarshal cluster cache: %v\n", err)
+		log.Logger().Warn("Failed to unmarshal cluster cache", zap.Error(err))
 		return
 	}
 
@@ -181,7 +181,7 @@ func (ctx *AppContext) loadClusterCacheFromDisk() {
 
 // hasServerChanged checks if the current server URL differs from the cached one
 func (ctx *AppContext) hasServerChanged() bool {
-	serverConfigPath := filepath.Join(ContextDir, ServerConfigFile)
+	serverConfigPath := filepath.Join(log.ContextDir, ServerConfigFile)
 
 	data, err := os.ReadFile(serverConfigPath)
 	if err != nil {
@@ -189,13 +189,13 @@ func (ctx *AppContext) hasServerChanged() bool {
 		if os.IsNotExist(err) {
 			return false
 		}
-		fmt.Fprintf(os.Stderr, "Warning: failed to read server config file: %v\n", err)
+		log.Logger().Warn("Failed to read server config file", zap.Error(err))
 		return false
 	}
 
 	var serverConfig ServerConfig
 	if err := json.Unmarshal(data, &serverConfig); err != nil {
-		fmt.Fprintf(os.Stderr, "Warning: failed to unmarshal server config: %v\n", err)
+		log.Logger().Warn("Failed to unmarshal server config", zap.Error(err))
 		return false
 	}
 
@@ -205,7 +205,7 @@ func (ctx *AppContext) hasServerChanged() bool {
 
 // saveServerConfig saves the current server configuration to disk
 func (ctx *AppContext) saveServerConfig() {
-	serverConfigPath := filepath.Join(ContextDir, ServerConfigFile)
+	serverConfigPath := filepath.Join(log.ContextDir, ServerConfigFile)
 
 	serverConfig := ServerConfig{
 		Server:  ctx.ArgoServer,
@@ -214,12 +214,12 @@ func (ctx *AppContext) saveServerConfig() {
 
 	data, err := json.MarshalIndent(serverConfig, "", "  ")
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Warning: failed to marshal server config: %v\n", err)
+		log.Logger().Warn("Failed to marshal server config", zap.Error(err))
 		return
 	}
 
 	if err := os.WriteFile(serverConfigPath, data, 0644); err != nil {
-		fmt.Fprintf(os.Stderr, "Warning: failed to write server config file: %v\n", err)
+		log.Logger().Warn("Failed to write server config file", zap.Error(err))
 	}
 }
 
@@ -232,9 +232,9 @@ func (ctx *AppContext) deleteAllCaches() {
 	}
 
 	for _, cacheFile := range cacheFiles {
-		cachePath := filepath.Join(ContextDir, cacheFile)
+		cachePath := filepath.Join(log.ContextDir, cacheFile)
 		if err := os.Remove(cachePath); err != nil && !os.IsNotExist(err) {
-			fmt.Fprintf(os.Stderr, "Warning: failed to remove cache file %s: %v\n", cacheFile, err)
+			log.Logger().Warn("Failed to remove cache file", zap.String("file", cacheFile), zap.Error(err))
 		}
 	}
 

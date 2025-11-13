@@ -34,6 +34,18 @@ tasks:
       - ./scripts/dev-watch.sh
 
   dev:
-    desc: Run the server directly (for manual testing)
+    desc: Run the server directly and tail logs (for manual testing)
     cmds:
-      - go run ./cmd/mcp_server
+      - |
+        # Start tailing logs in background
+        tail -f /tmp/bw-mcp/log.txt 2>/dev/null &
+        TAIL_PID=$!
+        
+        # Trap to kill tail on exit
+        trap "kill $TAIL_PID 2>/dev/null" EXIT
+        
+        # Run the server
+        go run ./cmd/mcp_server
+        
+        # Cleanup tail process
+        kill $TAIL_PID 2>/dev/null

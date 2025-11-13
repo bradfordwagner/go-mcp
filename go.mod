@@ -5,6 +5,7 @@ go 1.24.6
 require (
 	github.com/argoproj/argo-cd/v2 v2.14.21
 	github.com/modelcontextprotocol/go-sdk v1.1.0
+	go.uber.org/zap v1.27.0
 )
 
 require (
@@ -122,6 +123,7 @@ require (
 	go.opentelemetry.io/otel/metric v1.33.0 // indirect
 	go.opentelemetry.io/otel/trace v1.33.0 // indirect
 	go.starlark.net v0.0.0-20230525235612-a134d8f9ddca // indirect
+	go.uber.org/multierr v1.11.0 // indirect
 	golang.org/x/crypto v0.39.0 // indirect
 	golang.org/x/mod v0.25.0 // indirect
 	golang.org/x/net v0.41.0 // indirect

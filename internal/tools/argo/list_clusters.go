@@ -6,9 +6,11 @@ import (
 	"time"
 
 	"template_cli/internal/appcontext"
+	"template_cli/internal/log"
 
 	"github.com/argoproj/argo-cd/v2/pkg/apiclient/cluster"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
+	"go.uber.org/zap"
 )
 
 // ListClustersInput defines the input parameters for listing Argo clusters
@@ -31,14 +33,17 @@ func NewListClustersHandler(appCtx *appcontext.AppContext) func(context.Context,
 	return func(ctx context.Context, req *mcp.CallToolRequest, input ListClustersInput) (*mcp.CallToolResult, ListClustersOutput, error) {
 		// Check if we have cached clusters
 		if cachedClusters := appCtx.GetCachedClusters(); cachedClusters != nil {
+			log.Logger().Info("Returning cached clusters", zap.Int("count", len(cachedClusters.Items)))
 			return nil, ListClustersOutput{
 				Items: cachedClusters.Items,
 			}, nil
 		}
 
 		// Cache miss or expired - fetch from ArgoCD
+		log.Logger().Info("Cache miss, fetching clusters from ArgoCD")
 		conn, clusterClient, err := appCtx.ArgoClient.NewClusterClient()
 		if err != nil {
+			log.Logger().Error("Failed to create cluster client", zap.Error(err))
 			return nil, ListClustersOutput{}, fmt.Errorf("failed to create cluster client: %w", err)
 		}
 		defer conn.Close()
@@ -46,8 +51,11 @@ func NewListClustersHandler(appCtx *appcontext.AppContext) func(context.Context,
 		// List clusters
 		clusterList, err := clusterClient.List(ctx, &cluster.ClusterQuery{})
 		if err != nil {
+			log.Logger().Error("Failed to list clusters", zap.Error(err))
 			return nil, ListClustersOutput{}, fmt.Errorf("failed to list clusters: %w", err)
 		}
+
+		log.Logger().Info("Successfully fetched clusters from ArgoCD", zap.Int("count", len(clusterList.Items)))
 
 		// Cache the results
 		appCtx.SetClusterCache(clusterList.Items, ClusterCacheTTL)
