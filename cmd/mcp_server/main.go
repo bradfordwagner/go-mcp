@@ -4,6 +4,7 @@ import (
 	"context"
 	"log"
 
+	"template_cli/internal/argoclient"
 	"template_cli/internal/tools/argo"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
@@ -26,10 +27,17 @@ func SayHi(ctx context.Context, req *mcp.CallToolRequest, input Input) (
 }
 
 func main() {
+	// Initialize ArgoCD client
+	// Client config will be read from environment variables (ARGOCD_BASE_URL, ARGOCD_API_TOKEN)
+	argoClient, err := argoclient.NewClient(argoclient.Config{})
+	if err != nil {
+		log.Fatalf("Failed to create ArgoCD client: %v", err)
+	}
+
 	// Create a server with multiple tools.
 	server := mcp.NewServer(&mcp.Implementation{Name: "greeter", Version: "v1.0.0"}, nil)
 	mcp.AddTool(server, &mcp.Tool{Name: "greet", Description: "say hi"}, SayHi)
-	mcp.AddTool(server, &mcp.Tool{Name: "argocd_list_clusters", Description: "list Argo CD clusters"}, argo.ListClusters)
+	mcp.AddTool(server, &mcp.Tool{Name: "argocd_list_clusters", Description: "list Argo CD clusters"}, argo.NewListClustersHandler(argoClient))
 	// Run the server over stdin/stdout, until the client disconnects.
 	if err := server.Run(context.Background(), &mcp.StdioTransport{}); err != nil {
 		log.Fatal(err)
