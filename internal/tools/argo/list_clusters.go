@@ -3,8 +3,10 @@ package argo
 import (
 	"context"
 	"fmt"
+	"time"
 
-	"github.com/argoproj/argo-cd/v2/pkg/apiclient"
+	"template_cli/internal/appcontext"
+
 	"github.com/argoproj/argo-cd/v2/pkg/apiclient/cluster"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
@@ -19,11 +21,23 @@ type ListClustersOutput struct {
 	Items interface{} `json:"items" jsonschema:"raw cluster list from Argo CD API"`
 }
 
-// NewListClustersHandler creates a ListClusters handler with the provided ArgoCD client
-func NewListClustersHandler(apiClient apiclient.Client) func(context.Context, *mcp.CallToolRequest, ListClustersInput) (*mcp.CallToolResult, ListClustersOutput, error) {
+const (
+	// ClusterCacheTTL is the default time-to-live for cluster cache
+	ClusterCacheTTL = 60 * time.Minute
+)
+
+// NewListClustersHandler creates a ListClusters handler with the provided AppContext
+func NewListClustersHandler(appCtx *appcontext.AppContext) func(context.Context, *mcp.CallToolRequest, ListClustersInput) (*mcp.CallToolResult, ListClustersOutput, error) {
 	return func(ctx context.Context, req *mcp.CallToolRequest, input ListClustersInput) (*mcp.CallToolResult, ListClustersOutput, error) {
-		// Get cluster client
-		conn, clusterClient, err := apiClient.NewClusterClient()
+		// Check if we have cached clusters
+		if cachedClusters := appCtx.GetCachedClusters(); cachedClusters != nil {
+			return nil, ListClustersOutput{
+				Items: cachedClusters.Items,
+			}, nil
+		}
+
+		// Cache miss or expired - fetch from ArgoCD
+		conn, clusterClient, err := appCtx.ArgoClient.NewClusterClient()
 		if err != nil {
 			return nil, ListClustersOutput{}, fmt.Errorf("failed to create cluster client: %w", err)
 		}
@@ -34,6 +48,9 @@ func NewListClustersHandler(apiClient apiclient.Client) func(context.Context, *m
 		if err != nil {
 			return nil, ListClustersOutput{}, fmt.Errorf("failed to list clusters: %w", err)
 		}
+
+		// Cache the results
+		appCtx.SetClusterCache(clusterList.Items, ClusterCacheTTL)
 
 		// Return raw response from Argo CD API
 		return nil, ListClustersOutput{

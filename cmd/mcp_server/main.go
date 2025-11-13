@@ -4,6 +4,7 @@ import (
 	"context"
 	"log"
 
+	"template_cli/internal/appcontext"
 	"template_cli/internal/argoclient"
 	"template_cli/internal/tools/argo"
 
@@ -34,10 +35,13 @@ func main() {
 		log.Fatalf("Failed to create ArgoCD client: %v", err)
 	}
 
+	// Create application context with shared state and dependencies
+	appCtx := appcontext.NewAppContext(argoClient)
+
 	// Create a server with multiple tools.
 	server := mcp.NewServer(&mcp.Implementation{Name: "greeter", Version: "v1.0.0"}, nil)
 	mcp.AddTool(server, &mcp.Tool{Name: "greet", Description: "say hi"}, SayHi)
-	mcp.AddTool(server, &mcp.Tool{Name: "argocd_list_clusters", Description: "list Argo CD clusters"}, argo.NewListClustersHandler(argoClient))
+	mcp.AddTool(server, &mcp.Tool{Name: "argocd_list_clusters", Description: "list Argo CD clusters"}, argo.NewListClustersHandler(appCtx))
 	// Run the server over stdin/stdout, until the client disconnects.
 	if err := server.Run(context.Background(), &mcp.StdioTransport{}); err != nil {
 		log.Fatal(err)
