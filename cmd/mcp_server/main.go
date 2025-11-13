@@ -10,7 +10,6 @@ import (
 	"template_cli/internal/tools/argo"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
-	"go.uber.org/zap"
 )
 
 type Input struct {
@@ -36,13 +35,13 @@ func main() {
 	}
 	defer log.Sync()
 
-	log.Logger().Info("Starting MCP server")
+	l := log.Logger()
 
 	// Initialize ArgoCD client
 	// Client config will be read from environment variables (ARGOCD_BASE_URL, ARGOCD_API_TOKEN)
 	argoClientWithServer, err := argoclient.NewClient(argoclient.Config{})
 	if err != nil {
-		log.Logger().Fatal("Failed to create ArgoCD client", zap.Error(err))
+		l.Fatalw("Failed to create ArgoCD client", "error", err)
 	}
 
 	// Create application context with shared state and dependencies
@@ -54,10 +53,10 @@ func main() {
 	mcp.AddTool(server, &mcp.Tool{Name: "greet", Description: "say hi"}, SayHi)
 	mcp.AddTool(server, &mcp.Tool{Name: "argocd_list_clusters", Description: "list Argo CD clusters"}, argo.NewListClustersHandler(appCtx))
 
-	log.Logger().Info("MCP server initialized, starting server loop")
+	l.Info("MCP server initialized, starting server loop")
 
 	// Run the server over stdin/stdout, until the client disconnects.
 	if err := server.Run(context.Background(), &mcp.StdioTransport{}); err != nil {
-		log.Logger().Fatal("Server error", zap.Error(err))
+		l.Fatalw("Server error", "error", err)
 	}
 }

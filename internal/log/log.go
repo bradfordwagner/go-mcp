@@ -14,8 +14,8 @@ const (
 )
 
 var (
-	// log is the global logger instance
-	log *zap.Logger
+	// log is the global sugared logger instance
+	log *zap.SugaredLogger
 )
 
 // Init initializes the global logger
@@ -50,13 +50,14 @@ func Init() error {
 	)
 
 	// Create logger with file output only
-	log = zap.New(fileCore, zap.AddCaller(), zap.AddStacktrace(zapcore.ErrorLevel))
+	baseLogger := zap.New(fileCore, zap.AddCaller(), zap.AddStacktrace(zapcore.ErrorLevel))
+	log = baseLogger.Sugar()
 
 	return nil
 }
 
-// Logger returns the global logger instance
-func Logger() *zap.Logger {
+// Logger returns the global sugared logger instance
+func Logger() *zap.SugaredLogger {
 	return log
 }
 

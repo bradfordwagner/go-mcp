@@ -12,7 +12,6 @@ import (
 
 	"github.com/argoproj/argo-cd/v2/pkg/apiclient"
 	"github.com/argoproj/argo-cd/v2/pkg/apis/application/v1alpha1"
-	"go.uber.org/zap"
 )
 
 const (
@@ -60,7 +59,7 @@ func NewAppContext(argoClient apiclient.Client, argoServer string) *AppContext {
 	// Ensure context directory exists
 	if err := os.MkdirAll(log.ContextDir, 0755); err != nil {
 		// Log error but don't fail - we can still run without cache
-		log.Logger().Warn("Failed to create context directory", zap.Error(err))
+		log.Logger().Warnw("Failed to create context directory", "error", err)
 	}
 
 	// Check if server has changed and invalidate caches if needed
@@ -109,7 +108,7 @@ func (ctx *AppContext) SetClusterCache(items []v1alpha1.Cluster, ttl time.Durati
 
 	// Persist to disk
 	if err := ctx.writeClusterCacheToDisk(); err != nil {
-		log.Logger().Warn("Failed to write cluster cache to disk", zap.Error(err))
+		log.Logger().Warnw("Failed to write cluster cache to disk", "error", err)
 	}
 }
 
@@ -123,7 +122,7 @@ func (ctx *AppContext) InvalidateClusterCache() {
 	// Remove cache file from disk
 	cachePath := filepath.Join(log.ContextDir, ClusterCacheFile)
 	if err := os.Remove(cachePath); err != nil && !os.IsNotExist(err) {
-		log.Logger().Warn("Failed to remove cluster cache file", zap.Error(err))
+		log.Logger().Warnw("Failed to remove cluster cache file", "error", err)
 	}
 }
 
@@ -157,14 +156,14 @@ func (ctx *AppContext) loadClusterCacheFromDisk() {
 	data, err := os.ReadFile(cachePath)
 	if err != nil {
 		if !os.IsNotExist(err) {
-			log.Logger().Warn("Failed to read cluster cache file", zap.Error(err))
+			log.Logger().Warnw("Failed to read cluster cache file", "error", err)
 		}
 		return
 	}
 
 	var cache ClusterCache
 	if err := json.Unmarshal(data, &cache); err != nil {
-		log.Logger().Warn("Failed to unmarshal cluster cache", zap.Error(err))
+		log.Logger().Warnw("Failed to unmarshal cluster cache", "error", err)
 		return
 	}
 
@@ -189,13 +188,13 @@ func (ctx *AppContext) hasServerChanged() bool {
 		if os.IsNotExist(err) {
 			return false
 		}
-		log.Logger().Warn("Failed to read server config file", zap.Error(err))
+		log.Logger().Warnw("Failed to read server config file", "error", err)
 		return false
 	}
 
 	var serverConfig ServerConfig
 	if err := json.Unmarshal(data, &serverConfig); err != nil {
-		log.Logger().Warn("Failed to unmarshal server config", zap.Error(err))
+		log.Logger().Warnw("Failed to unmarshal server config", "error", err)
 		return false
 	}
 
@@ -214,12 +213,12 @@ func (ctx *AppContext) saveServerConfig() {
 
 	data, err := json.MarshalIndent(serverConfig, "", "  ")
 	if err != nil {
-		log.Logger().Warn("Failed to marshal server config", zap.Error(err))
+		log.Logger().Warnw("Failed to marshal server config", "error", err)
 		return
 	}
 
 	if err := os.WriteFile(serverConfigPath, data, 0644); err != nil {
-		log.Logger().Warn("Failed to write server config file", zap.Error(err))
+		log.Logger().Warnw("Failed to write server config file", "error", err)
 	}
 }
 
@@ -234,7 +233,7 @@ func (ctx *AppContext) deleteAllCaches() {
 	for _, cacheFile := range cacheFiles {
 		cachePath := filepath.Join(log.ContextDir, cacheFile)
 		if err := os.Remove(cachePath); err != nil && !os.IsNotExist(err) {
-			log.Logger().Warn("Failed to remove cache file", zap.String("file", cacheFile), zap.Error(err))
+			log.Logger().Warnw("Failed to remove cache file", "file", cacheFile, "error", err)
 		}
 	}
 

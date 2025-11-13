@@ -28,11 +28,6 @@ tasks:
     cmds:
       - go run ./cmd/test_client {{.TOOL}} '{{.ARGS}}'
 
-  watch:
-    desc: Watch for changes and run tests automatically
-    cmds:
-      - ./scripts/dev-watch.sh
-
   dev:
     desc: Run the server directly and tail logs (for manual testing)
     cmds:
