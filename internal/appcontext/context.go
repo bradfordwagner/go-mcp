@@ -28,6 +28,10 @@ type AppContext struct {
 	// ClusterCache holds cached cluster information
 	clusterCache      *ClusterCache
 	clusterCacheMutex sync.RWMutex
+
+	// ApplicationCache holds cached application information
+	applicationCache      *ApplicationCache
+	applicationCacheMutex sync.RWMutex
 }
 
 // ServerConfig represents cached server configuration
@@ -59,8 +63,9 @@ func NewAppContext(argoClient apiclient.Client, argoServer string) *AppContext {
 	// Save current server configuration
 	ctx.saveServerConfig()
 
-	// Try to load existing cache from disk
+	// Try to load existing caches from disk
 	ctx.loadClusterCacheFromDisk()
+	ctx.loadApplicationCacheFromDisk()
 
 	return ctx
 }
@@ -114,6 +119,7 @@ func (ctx *AppContext) deleteAllCaches() {
 	// List of cache files to delete
 	cacheFiles := []string{
 		ClusterCacheFile,
+		ApplicationCacheFile,
 		// Add more cache files here as they are added to the system
 	}
 
@@ -124,8 +130,12 @@ func (ctx *AppContext) deleteAllCaches() {
 		}
 	}
 
-	// Clear in-memory cache
+	// Clear in-memory caches
 	ctx.clusterCacheMutex.Lock()
 	ctx.clusterCache = nil
 	ctx.clusterCacheMutex.Unlock()
+
+	ctx.applicationCacheMutex.Lock()
+	ctx.applicationCache = nil
+	ctx.applicationCacheMutex.Unlock()
 }

@@ -57,6 +57,7 @@ func main() {
 	server := mcp.NewServer(&mcp.Implementation{Name: "greeter", Version: "v1.0.0"}, nil)
 	mcp.AddTool(server, &mcp.Tool{Name: "greet", Description: "say hi"}, SayHi)
 	mcp.AddTool(server, &mcp.Tool{Name: "argocd_list_clusters", Description: "list Argo CD clusters"}, argo.NewListClustersHandler(appCtx))
+	mcp.AddTool(server, &mcp.Tool{Name: "argocd_list_applications", Description: "list Argo CD applications with optional filters"}, argo.NewListApplicationsHandler(appCtx))
 
 	l.Info("MCP server initialized, starting server loop")
 
