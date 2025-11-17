@@ -38,8 +38,13 @@ func main() {
 	l := log.Logger()
 
 	// Initialize ArgoCD client
-	// Client config will be read from environment variables (ARGOCD_BASE_URL, ARGOCD_API_TOKEN)
-	argoClientWithServer, err := argoclient.NewClient(argoclient.Config{})
+	// Client config will be read from environment variables (ARGOCD_BASE_URL, ARGOCD_API_TOKEN, ARGOCD_INSECURE)
+	cfg, err := argoclient.NewConfigFromEnv(context.Background())
+	if err != nil {
+		l.Fatalw("Failed to load ArgoCD config from environment", "error", err)
+	}
+
+	argoClientWithServer, err := argoclient.NewClient(*cfg)
 	if err != nil {
 		l.Fatalw("Failed to create ArgoCD client", "error", err)
 	}

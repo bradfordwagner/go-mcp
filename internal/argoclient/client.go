@@ -1,18 +1,28 @@
 package argoclient
 
 import (
+	"context"
 	"fmt"
-	"os"
 	"strings"
 
 	"github.com/argoproj/argo-cd/v2/pkg/apiclient"
+	"github.com/sethvargo/go-envconfig"
 )
 
 // Config defines the configuration for creating an Argo CD client
 type Config struct {
-	Server    string
-	AuthToken string
-	Insecure  bool
+	Server    string `env:"ARGOCD_BASE_URL,required"`
+	AuthToken string `env:"ARGOCD_API_TOKEN,required"`
+	Insecure  bool   `env:"ARGOCD_INSECURE,default=false"`
+}
+
+// NewConfigFromEnv loads the Argo CD configuration from environment variables
+func NewConfigFromEnv(ctx context.Context) (*Config, error) {
+	var cfg Config
+	if err := envconfig.Process(ctx, &cfg); err != nil {
+		return nil, fmt.Errorf("failed to process environment variables: %w", err)
+	}
+	return &cfg, nil
 }
 
 // ClientWithServer wraps an Argo CD client with its server URL
@@ -24,33 +34,15 @@ type ClientWithServer struct {
 // NewClient creates a new Argo CD API client with the provided configuration
 // Returns the client and the normalized server URL it's connected to
 func NewClient(cfg Config) (*ClientWithServer, error) {
-	// Get server address from config or environment
-	server := cfg.Server
-	if server == "" {
-		server = os.Getenv("ARGOCD_BASE_URL")
-		if server == "" {
-			return nil, fmt.Errorf("argo CD server address not provided. Set ARGOCD_BASE_URL env var or pass server in config")
-		}
-	}
-
 	// Strip URL scheme if present (https:// or http://)
 	// The Argo CD gRPC client expects just the hostname:port
-	server = strings.TrimPrefix(server, "https://")
+	server := strings.TrimPrefix(cfg.Server, "https://")
 	server = strings.TrimPrefix(server, "http://")
-
-	// Get auth token from config or environment
-	authToken := cfg.AuthToken
-	if authToken == "" {
-		authToken = os.Getenv("ARGOCD_API_TOKEN")
-		if authToken == "" {
-			return nil, fmt.Errorf("argo CD auth token not provided. Set ARGOCD_API_TOKEN env var or pass auth_token in config")
-		}
-	}
 
 	// Create Argo CD client
 	clientOpts := apiclient.ClientOptions{
 		ServerAddr: server,
-		AuthToken:  authToken,
+		AuthToken:  cfg.AuthToken,
 		Insecure:   cfg.Insecure,
 	}
 
