@@ -26,7 +26,7 @@ task test
 task test-argo
 
 # Test any tool with custom arguments
-task test-custom TOOL=greet ARGS='{"name":"Brad"}'
+task test-custom TOOL=argocd_list_clusters ARGS='{}'
 
 # Watch mode - auto-test on file changes
 task watch
@@ -42,19 +42,16 @@ The project includes a custom Go test client (`cmd/test_client`) that provides i
 Best for: Testing individual tool changes without restarting Cursor
 
 ```bash
-# Test the greet tool
-task test
-# or directly: go run ./cmd/test_client greet '{"name":"Developer"}'
-
 # Test ArgoCD list clusters
-task test-argo
+task test
 # or directly: go run ./cmd/test_client argocd_list_clusters '{}'
+
+# Test ArgoCD list applications
+task test-argo
+# or directly: go run ./cmd/test_client argocd_list_applications '{}'
 
 # Test any tool with custom arguments
 task test-custom TOOL=your_tool_name ARGS='{"param":"value"}'
-
-# Test directly with the Go client
-go run ./cmd/test_client greet '{"name":"Brad"}'
 ```
 
 **Pros:** Instant feedback (2-3 seconds), no need to restart Cursor, see full JSON-RPC flow, colored output
@@ -150,7 +147,7 @@ The test client shows the complete JSON-RPC flow:
 3. Tool call request/response
 
 ```bash
-go run ./cmd/test_client greet '{"name":"Debug"}'
+go run ./cmd/test_client argocd_list_clusters '{}'
 ```
 
 #### Inspect server output directly
@@ -177,8 +174,8 @@ go run ./cmd/mcp_server
 
 2. **Use task commands** - They're shorter and easier to remember
    ```bash
-   task test                                    # Quick test with greet
-   task test-argo                               # Test ArgoCD functionality
+   task test                                    # Quick test with ArgoCD list clusters
+   task test-argo                               # Test ArgoCD list clusters
    task test-custom TOOL=x ARGS='{"y":"z"}'    # Test any tool
    task watch                                   # Continuous development
    ```

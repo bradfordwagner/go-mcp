@@ -32,7 +32,7 @@ type RPCError struct {
 func main() {
 	if len(os.Args) < 2 {
 		fmt.Println("Usage: test_client <tool_name> [args_json]")
-		fmt.Println("Example: test_client greet '{\"name\":\"Developer\"}'")
+		fmt.Println("Example: test_client argocd_list_clusters '{}'")
 		os.Exit(1)
 	}
 

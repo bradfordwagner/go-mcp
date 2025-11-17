@@ -14,9 +14,9 @@ tasks:
 
   # Quick development tasks
   test:
-    desc: Test the MCP server with a simple greet command
+    desc: Test the MCP server with ArgoCD list clusters
     cmds:
-      - go run ./cmd/test_client greet '{"name":"Developer"}'
+      - go run ./cmd/test_client argocd_list_clusters '{}'
 
   test-argo:
     desc: Test the ArgoCD list_clusters tool

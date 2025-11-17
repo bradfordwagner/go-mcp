@@ -18,14 +18,14 @@ The `.env.sh` file is gitignored and will be automatically loaded by all task co
 ## Test Your MCP Server in Seconds
 
 ```bash
-# Test the greet tool (2-3 seconds)
+# Test ArgoCD list clusters (2-3 seconds)
 task test
 
-# Test ArgoCD list clusters
+# Test ArgoCD list applications
 task test-argo
 
 # Test any tool with custom arguments
-task test-custom TOOL=greet ARGS='{"name":"Brad"}'
+task test-custom TOOL=argocd_list_applications ARGS='{"project":"myproject"}'
 ```
 
 ## Watch Mode (Best for Development)
