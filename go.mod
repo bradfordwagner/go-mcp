@@ -1,6 +1,6 @@
 module template_cli
 
-go 1.24.6
+go 1.26.4
 
 require (
 	github.com/argoproj/argo-cd/v2 v2.14.21
